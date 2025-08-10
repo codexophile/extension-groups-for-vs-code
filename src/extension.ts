@@ -23,20 +23,9 @@ export function activate(context: vscode.ExtensionContext) {
     'extensionGroups'
   ) || { groups: [] };
 
-  // Register the TreeDataProvider for both views
+  // Register the TreeDataProvider for the activity bar view only
   const extensionGroupsProvider = new ExtensionGroupsProvider(state, context);
-
-  // Register the provider for the activity bar view
-  vscode.window.registerTreeDataProvider(
-    'extensionGroups',
-    extensionGroupsProvider
-  );
-
-  // Register the provider for the extensions tab view
-  vscode.window.registerTreeDataProvider(
-    'extensionGroupsView',
-    extensionGroupsProvider
-  );
+  vscode.window.registerTreeDataProvider('extensionGroups', extensionGroupsProvider);
 
   // Register commands
   context.subscriptions.push(
