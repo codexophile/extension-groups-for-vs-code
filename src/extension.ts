@@ -25,7 +25,10 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Register the TreeDataProvider for the activity bar view only
   const extensionGroupsProvider = new ExtensionGroupsProvider(state, context);
-  vscode.window.registerTreeDataProvider('extensionGroups', extensionGroupsProvider);
+  vscode.window.registerTreeDataProvider(
+    'extensionGroups',
+    extensionGroupsProvider
+  );
 
   // Register commands
   context.subscriptions.push(
@@ -348,14 +351,21 @@ class ExtensionGroupsProvider
         return Promise.resolve(
           uncategorized.map(ext => {
             const label = ext.packageJSON.displayName || ext.packageJSON.name;
+            const iconRel = ext.packageJSON.icon;
+            let iconPath: string | undefined;
+            if (iconRel) {
+              iconPath = path.join(ext.extensionPath, iconRel);
+            }
+            const description = ext.packageJSON.description || '';
+            const categories = ext.packageJSON.categories || [];
             const treeItem = new ExtensionTreeItem(
               label,
               ext.id,
               '__uncategorized__',
-              vscode.TreeItemCollapsibleState.None
+              vscode.TreeItemCollapsibleState.None,
+              { description, iconPath, categories }
             );
             treeItem.contextValue = 'extension';
-            treeItem.iconPath = new vscode.ThemeIcon('extensions');
             return treeItem;
           })
         );
@@ -366,17 +376,26 @@ class ExtensionGroupsProvider
           return Promise.resolve(
             group.extensions.map(extId => {
               const ext = vscode.extensions.getExtension(extId);
-              const label = ext
-                ? ext.packageJSON.displayName || ext.packageJSON.name
-                : extId;
+              let label = extId;
+              let iconPath: string | undefined;
+              let description = '';
+              let categories: string[] = [];
+              if (ext) {
+                label = ext.packageJSON.displayName || ext.packageJSON.name;
+                if (ext.packageJSON.icon) {
+                  iconPath = path.join(ext.extensionPath, ext.packageJSON.icon);
+                }
+                description = ext.packageJSON.description || '';
+                categories = ext.packageJSON.categories || [];
+              }
               const treeItem = new ExtensionTreeItem(
                 label,
                 extId,
                 group.id,
-                vscode.TreeItemCollapsibleState.None
+                vscode.TreeItemCollapsibleState.None,
+                { description, iconPath, categories }
               );
               treeItem.contextValue = 'extension';
-              treeItem.iconPath = new vscode.ThemeIcon('extensions');
               return treeItem;
             })
           );
@@ -405,10 +424,29 @@ class ExtensionTreeItem extends vscode.TreeItem {
     public readonly label: string,
     public readonly extensionId: string,
     public readonly groupId: string,
-    public readonly collapsibleState: vscode.TreeItemCollapsibleState
+    public readonly collapsibleState: vscode.TreeItemCollapsibleState,
+    extMeta?: {
+      description?: string;
+      iconPath?: string;
+      categories?: string[];
+    }
   ) {
     super(label, collapsibleState);
-    this.tooltip = extensionId;
+    if (extMeta) {
+      this.description = extMeta.description || '';
+      if (extMeta.iconPath) {
+        this.iconPath = extMeta.iconPath;
+      }
+      if (extMeta.categories && extMeta.categories.length > 0) {
+        this.tooltip = `${label}\n${
+          extMeta.description || ''
+        }\nCategories: ${extMeta.categories.join(', ')}`;
+      } else {
+        this.tooltip = extMeta.description || extensionId;
+      }
+    } else {
+      this.tooltip = extensionId;
+    }
   }
 }
 
