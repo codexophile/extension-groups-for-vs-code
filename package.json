@@ -64,7 +64,8 @@
       "extension-groups": [
         {
           "id": "extensionGroups",
-          "name": "Extension Groups"
+          "name": "Extension Groups",
+          "icon": "$(play)"
         }
       ]
     },
