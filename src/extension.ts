@@ -25,10 +25,19 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Register the TreeDataProvider for the activity bar view only
   const extensionGroupsProvider = new ExtensionGroupsProvider(state, context);
-  vscode.window.registerTreeDataProvider(
-    'extensionGroups',
-    extensionGroupsProvider
-  );
+  vscode.window.createTreeView('extensionGroups', {
+    treeDataProvider: extensionGroupsProvider,
+    dragAndDropController: extensionGroupsProvider,
+  });
+
+  // Helper to update provider state after any state change
+  function updateProviderState() {
+    let newState = context.globalState.get(
+      'extensionGroups'
+    ) as ExtensionGroupsState;
+    if (!newState || !Array.isArray(newState.groups)) newState = { groups: [] };
+    extensionGroupsProvider.setState(newState);
+  }
 
   // Register commands
   context.subscriptions.push(
@@ -47,10 +56,9 @@ export function activate(context: vscode.ExtensionContext) {
             extensions: [],
             isActive: false,
           };
-
           state.groups.push(newGroup);
           await context.globalState.update('extensionGroups', state);
-          extensionGroupsProvider.refresh();
+          updateProviderState();
         }
       }
     ),
@@ -67,7 +75,7 @@ export function activate(context: vscode.ExtensionContext) {
         if (confirmation === 'Yes') {
           state.groups = state.groups.filter(g => g.id !== group.groupId);
           await context.globalState.update('extensionGroups', state);
-          extensionGroupsProvider.refresh();
+          updateProviderState();
         }
       }
     ),
@@ -98,7 +106,7 @@ export function activate(context: vscode.ExtensionContext) {
           ) {
             targetGroup.extensions.push(selectedExtension.id);
             await context.globalState.update('extensionGroups', state);
-            extensionGroupsProvider.refresh();
+            updateProviderState();
           }
         }
       }
@@ -113,7 +121,7 @@ export function activate(context: vscode.ExtensionContext) {
             id => id !== extension.extensionId
           );
           await context.globalState.update('extensionGroups', state);
-          extensionGroupsProvider.refresh();
+          updateProviderState();
         }
       }
     ),
@@ -144,7 +152,7 @@ export function activate(context: vscode.ExtensionContext) {
 
           targetGroup.isActive = !targetGroup.isActive;
           await context.globalState.update('extensionGroups', state);
-          extensionGroupsProvider.refresh();
+          updateProviderState();
 
           if (!targetGroup.isActive) {
             // If we're disabling extensions, prompt for reload
@@ -186,7 +194,7 @@ export function activate(context: vscode.ExtensionContext) {
             }
 
             await context.globalState.update('extensionGroups', state);
-            extensionGroupsProvider.refresh();
+            updateProviderState();
           }
         } else if (
           source instanceof ExtensionGroupTreeItem &&
@@ -203,7 +211,7 @@ export function activate(context: vscode.ExtensionContext) {
 
             state.groups = groups;
             await context.globalState.update('extensionGroups', state);
-            extensionGroupsProvider.refresh();
+            updateProviderState();
           }
         }
       }
@@ -237,7 +245,7 @@ export function activate(context: vscode.ExtensionContext) {
               state.lastSyncTime
             ).toLocaleString()}`
           );
-          extensionGroupsProvider.refresh();
+          updateProviderState();
         } catch (error) {
           vscode.window.showErrorMessage(
             `Failed to sync extension groups: ${error}`
@@ -261,7 +269,7 @@ export function activate(context: vscode.ExtensionContext) {
 
             state = importedState;
             await context.globalState.update('extensionGroups', state);
-            extensionGroupsProvider.refresh();
+            updateProviderState();
 
             vscode.window.showInformationMessage(
               'Extension groups imported successfully'
@@ -283,8 +291,13 @@ export function activate(context: vscode.ExtensionContext) {
 
 // Tree data provider for the sidebar view
 class ExtensionGroupsProvider
-  implements vscode.TreeDataProvider<vscode.TreeItem>
+  implements
+    vscode.TreeDataProvider<vscode.TreeItem>,
+    vscode.TreeDragAndDropController<vscode.TreeItem>
 {
+  readonly dropMimeTypes = ['application/vnd.code.extension'];
+  readonly dragMimeTypes = ['application/vnd.code.extension'];
+
   private _onDidChangeTreeData: vscode.EventEmitter<
     vscode.TreeItem | undefined | null | void
   > = new vscode.EventEmitter<vscode.TreeItem | undefined | null | void>();
@@ -296,6 +309,11 @@ class ExtensionGroupsProvider
     private state: ExtensionGroupsState,
     private context: vscode.ExtensionContext
   ) {}
+
+  setState(newState: ExtensionGroupsState) {
+    this.state = newState;
+    this.refresh();
+  }
 
   refresh(): void {
     this._onDidChangeTreeData.fire();
@@ -403,6 +421,77 @@ class ExtensionGroupsProvider
       }
     }
     return Promise.resolve([]);
+  }
+
+  async handleDrag(
+    source: vscode.TreeItem[],
+    dataTransfer: vscode.DataTransfer,
+    token: vscode.CancellationToken
+  ): Promise<void> {
+    // Only allow dragging ExtensionTreeItem
+    const extItems = source.filter(
+      item => item instanceof ExtensionTreeItem
+    ) as ExtensionTreeItem[];
+    if (extItems.length > 0) {
+      const payload = extItems.map(item => ({
+        extensionId: item.extensionId,
+        groupId: item.groupId,
+      }));
+      dataTransfer.set(
+        'application/vnd.code.extension',
+        new vscode.DataTransferItem(JSON.stringify(payload))
+      );
+    }
+  }
+
+  async handleDrop(
+    target: vscode.TreeItem | undefined,
+    dataTransfer: vscode.DataTransfer,
+    token: vscode.CancellationToken
+  ): Promise<void> {
+    const extData = dataTransfer.get('application/vnd.code.extension');
+    if (!extData) return;
+    const raw = await extData.asString();
+    let items: { extensionId: string; groupId: string }[];
+    try {
+      items = JSON.parse(raw);
+    } catch {
+      return;
+    }
+
+    // Determine target group id (allow dropping on group header or item)
+    let targetGroupId: string | undefined;
+    if (target instanceof ExtensionGroupTreeItem) {
+      targetGroupId = target.groupId;
+    } else if (target instanceof ExtensionTreeItem) {
+      targetGroupId = target.groupId;
+    }
+    if (!targetGroupId) return;
+
+    for (const { extensionId, groupId: sourceGroupId } of items) {
+      // Remove from source group if present
+      const sourceGroup = this.state.groups.find(g => g.id === sourceGroupId);
+      if (sourceGroup) {
+        sourceGroup.extensions = sourceGroup.extensions.filter(
+          id => id !== extensionId
+        );
+      }
+      // If target is Uncategorized, don't add to any group (it will appear in computed Uncategorized)
+      if (targetGroupId !== '__uncategorized__') {
+        const targetGroup = this.state.groups.find(g => g.id === targetGroupId);
+        if (targetGroup && !targetGroup.extensions.includes(extensionId)) {
+          targetGroup.extensions.push(extensionId);
+        }
+      }
+    }
+
+    await this.context.globalState.update('extensionGroups', this.state);
+    // Refresh state from globalState to ensure UI updates
+    let newState = this.context.globalState.get(
+      'extensionGroups'
+    ) as ExtensionGroupsState;
+    if (!newState || !Array.isArray(newState.groups)) newState = { groups: [] };
+    this.setState(newState);
   }
 }
 
