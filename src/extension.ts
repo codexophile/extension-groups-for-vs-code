@@ -28,6 +28,7 @@ export function activate(context: vscode.ExtensionContext) {
   vscode.window.createTreeView('extensionGroups', {
     treeDataProvider: extensionGroupsProvider,
     dragAndDropController: extensionGroupsProvider,
+    canSelectMany: true,
   });
 
   // Helper to update provider state after any state change
