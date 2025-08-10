@@ -21,9 +21,14 @@ export function activate(context: vscode.ExtensionContext) {
     // Initialize storage for extension groups
     let state: ExtensionGroupsState = context.globalState.get('extensionGroups') || { groups: [] };
 
-    // Register the TreeDataProvider for the sidebar view
+    // Register the TreeDataProvider for both views
     const extensionGroupsProvider = new ExtensionGroupsProvider(state, context);
+    
+    // Register the provider for the activity bar view
     vscode.window.registerTreeDataProvider('extensionGroups', extensionGroupsProvider);
+    
+    // Register the provider for the extensions tab view
+    vscode.window.registerTreeDataProvider('extensionGroupsView', extensionGroupsProvider);
 
     // Register commands
     context.subscriptions.push(

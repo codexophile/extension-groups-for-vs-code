@@ -51,11 +51,24 @@
         "icon": "$(cloud-download)"
       }
     ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "extension-groups",
+          "title": "Extension Groups",
+          "icon": "assets/icon.svg"
+        }
+      ]
+    },
     "views": {
-      "explorer": [
+      "extension-groups": [
         {
           "id": "extensionGroups",
           "name": "Extension Groups"
+        },
+        {
+          "id": "extensionGroupsView",
+          "name": "Extension Groups View"
         }
       ]
     },
@@ -63,39 +76,39 @@
       "view/title": [
         {
           "command": "extension-groups.createGroup",
-          "when": "view == extensionGroups",
+          "when": "view == extensionGroups || view == extensionGroupsView",
           "group": "navigation"
         },
         {
           "command": "extension-groups.syncSettings",
-          "when": "view == extensionGroups",
+          "when": "view == extensionGroups || view == extensionGroupsView",
           "group": "navigation"
         },
         {
           "command": "extension-groups.importSettings",
-          "when": "view == extensionGroups",
+          "when": "view == extensionGroups || view == extensionGroupsView",
           "group": "navigation"
         }
       ],
       "view/item/context": [
         {
           "command": "extension-groups.deleteGroup",
-          "when": "view == extensionGroups && viewItem == extensionGroup",
+          "when": "(view == extensionGroups || view == extensionGroupsView) && viewItem == extensionGroup",
           "group": "inline"
         },
         {
           "command": "extension-groups.addExtension",
-          "when": "view == extensionGroups && viewItem == extensionGroup",
+          "when": "(view == extensionGroups || view == extensionGroupsView) && viewItem == extensionGroup",
           "group": "inline"
         },
         {
           "command": "extension-groups.activateGroup",
-          "when": "view == extensionGroups && viewItem == extensionGroup",
+          "when": "(view == extensionGroups || view == extensionGroupsView) && viewItem == extensionGroup",
           "group": "inline"
         },
         {
           "command": "extension-groups.removeExtension",
-          "when": "view == extensionGroups && viewItem == extension",
+          "when": "(view == extensionGroups || view == extensionGroupsView) && viewItem == extension",
           "group": "inline"
         }
       ]
