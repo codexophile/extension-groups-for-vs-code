@@ -432,21 +432,27 @@ class ExtensionTreeItem extends vscode.TreeItem {
     }
   ) {
     super(label, collapsibleState);
-    if (extMeta) {
-      this.description = extMeta.description || '';
-      if (extMeta.iconPath) {
-        this.iconPath = extMeta.iconPath;
-      }
-      if (extMeta.categories && extMeta.categories.length > 0) {
-        this.tooltip = `${label}\n${
-          extMeta.description || ''
-        }\nCategories: ${extMeta.categories.join(', ')}`;
-      } else {
-        this.tooltip = extMeta.description || extensionId;
-      }
-    } else {
-      this.tooltip = extensionId;
+    // Set icon
+    if (extMeta?.iconPath) {
+      this.iconPath = extMeta.iconPath;
     }
+    // Set category/categories as description
+    if (extMeta?.categories && extMeta.categories.length > 0) {
+      this.description = extMeta.categories.join(', ');
+    } else {
+      this.description = '';
+    }
+    // Tooltip: name, description, categories, extensionId
+    const details: string[] = [];
+    details.push(`Name: ${label}`);
+    if (extMeta?.description) {
+      details.push(`Description: ${extMeta.description}`);
+    }
+    if (extMeta?.categories && extMeta.categories.length > 0) {
+      details.push(`Category: ${extMeta.categories.join(', ')}`);
+    }
+    details.push(`ID: ${extensionId}`);
+    this.tooltip = details.join('\n');
   }
 }
 
